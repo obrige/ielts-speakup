@@ -1,0 +1,43 @@
+# Docker build 忽略(项目根目录 .dockerignore)
+# 加速镜像构建,避免无关文件进入上下文
+
+# Git
+.git/
+.gitignore
+
+# 数据 & 临时
+data/
+*.wav
+*.mp3
+*.m4a
+*.webm
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+*.egg-info/
+venv/
+.venv/
+
+# 前端依赖(本项目纯静态,无 node_modules)
+node_modules/
+dist/
+
+# IDE & 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 文档(可选,文档不进镜像)
+README.md
+QUICKSTART.md
+VERIFICATION.md
+
+# Docker 配置自身
+docker-compose.yml
+.dockerignore

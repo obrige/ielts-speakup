@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: ielts-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./data/audio:/tmp/audio
+      - ./frontend:/app/frontend:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+# 备注:
+# - 后端构建上下文设为项目根,这样 Dockerfile 能 COPY backend/ 和 frontend/
+# - frontend 用 volume 挂载(只读),开发时改前端文件立即生效,无需重建镜像
+# - 第一次启动会自动从 HF 下载 whisper-large-v3 (~1.5GB) + wav2vec2-base-960h (~360MB)
+# - 国内网络慢的话,设置 HF_ENDPOINT=https://hf-mirror.com

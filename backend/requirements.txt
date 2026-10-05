@@ -1,0 +1,30 @@
+# 后端依赖(Python 3.11+)
+# API
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# ASR (调 WhisperX HTTP,不直接装 torch 这边;本地仅 wav2vec2 推理)
+transformers==4.47.2
+torch==2.5.1
+torchaudio==2.5.1
+# 注意:torch CUDA 版本需与宿主机对齐;本地无 GPU 时改用 CPU 版本
+
+# 信号处理 + 文本统计
+librosa==0.10.2
+soundfile==0.12.1  # smoke test 写入合成 WAV 用
+numpy==1.26.4
+scipy==1.13.1
+
+# 发音 + 音素
+phonemizer==3.3.0
+Levenshtein==0.26.1
+# espeak-ng 需系统包;apt install espeak-ng (Linux) / brew install espeak (macOS)
+
+# LLM
+openai==1.59.0  # DeepSeek/Qwen 兼容 OpenAI SDK
+
+# 工具
+pydantic==2.10.4
+python-dotenv==1.0.1
+aiofiles==24.1.0

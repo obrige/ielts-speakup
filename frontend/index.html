@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IELTS Speaking Practice</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .recording-pulse { animation: pulse 1.5s infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+  }
+  .score-badge {
+    background: linear-gradient(135deg, #9013fe 0%, #7c3aed 100%);
+  }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+<div class="max-w-4xl mx-auto p-6">
+  <!-- Header -->
+  <header class="mb-8">
+    <h1 class="text-3xl font-bold text-slate-900">IELTS Speaking Practice</h1>
+    <p class="text-slate-600 mt-2">基于 IELTS 官方评分标准的 AI 辅助练习</p>
+    <p class="text-xs text-amber-700 mt-2 bg-amber-50 p-2 rounded">
+      ⚠️ AI 评分尚未经过真人考官校准验证,单次评分误差约 ±0.5 band。本工具用于辅助练习,建议结合真人老师反馈使用。
+    </p>
+  </header>
+
+  <!-- Question Selection -->
+  <section id="question-section" class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">选择题目</h2>
+    <div class="flex gap-2 mb-4">
+      <button data-part="1" class="part-tab px-4 py-2 rounded bg-purple-600 text-white">Part 1</button>
+      <button data-part="2" class="part-tab px-4 py-2 rounded bg-slate-200 text-slate-700">Part 2</button>
+      <button data-part="3" class="part-tab px-4 py-2 rounded bg-slate-200 text-slate-700">Part 3</button>
+    </div>
+    <div id="question-list" class="space-y-3"></div>
+  </section>
+
+  <!-- Recording -->
+  <section id="record-section" class="bg-white rounded-lg shadow-sm p-6 mb-6 hidden">
+    <h2 class="text-xl font-semibold mb-2">当前题目</h2>
+    <p id="current-question" class="text-slate-700 mb-4 text-lg"></p>
+    <p id="current-cues" class="text-slate-500 text-sm mb-6"></p>
+
+    <div class="flex items-center gap-4 mb-4">
+      <button id="btn-record" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-full font-medium recording-pulse">
+        ● 开始录音
+      </button>
+      <button id="btn-stop" class="bg-slate-700 hover:bg-slate-800 text-white px-6 py-3 rounded-full font-medium hidden">
+        ■ 停止
+      </button>
+      <span id="timer" class="text-slate-600 text-lg font-mono">00:00</span>
+    </div>
+
+    <div id="record-status" class="text-sm text-slate-500"></div>
+  </section>
+
+  <!-- Loading -->
+  <section id="loading-section" class="bg-white rounded-lg shadow-sm p-6 mb-6 hidden">
+    <div class="flex items-center gap-3">
+      <div class="animate-spin h-6 w-6 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+      <div>
+        <p class="font-medium text-slate-900">AI 评分中...</p>
+        <p class="text-sm text-slate-500">包含 14 子维评分 + 句级反馈 + ZPD 个性化范例,大约需要 5-10 秒</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="recorder.js"></script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>评分报告 · IELTS Speaking Practice</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .tab-active { background: #9013fe; color: white; }
+  .dim-card { border-left: 4px solid #9013fe; }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+<div class="max-w-5xl mx-auto p-6">
+  <a href="/" class="text-purple-600 hover:underline text-sm">← 返回重新练习</a>
+
+  <header class="my-6">
+    <h1 class="text-3xl font-bold text-slate-900">评分报告</h1>
+    <p id="question-display" class="text-slate-600 mt-2"></p>
+  </header>
+
+  <!-- 总分 + 雷达图 -->
+  <section class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <div class="grid md:grid-cols-2 gap-6">
+      <div>
+        <p class="text-sm text-slate-500">总体评分 (Overall)</p>
+        <p id="overall-score" class="text-6xl font-bold text-purple-600 my-2">--</p>
+        <p id="cefr-level" class="text-slate-500"></p>
+        <p id="disclaimer" class="text-xs text-amber-700 bg-amber-50 p-2 rounded mt-4"></p>
+      </div>
+      <div>
+        <canvas id="radar-chart" height="250"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 主维详情 -->
+  <section class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">四项评分标准</h2>
+    <div class="grid md:grid-cols-2 gap-4" id="main-dim-grid"></div>
+  </section>
+
+  <!-- 14 子维 -->
+  <section class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">14 项子维度</h2>
+    <div class="grid md:grid-cols-3 gap-3" id="sub-dim-grid"></div>
+  </section>
+
+  <!-- 句子级反馈 -->
+  <section class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">逐句反馈</h2>
+    <div id="sentences-list" class="space-y-4"></div>
+  </section>
+
+  <!-- ZPD 范例 -->
+  <section class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">个性化改进范例 (ZPD)</h2>
+    <p class="text-sm text-slate-500 mb-4">基于最近发展区原理,每个范例都比你的当前水平略高一点</p>
+    <div id="zpd-list" class="space-y-4"></div>
+  </section>
+
+  <!-- 总评 -->
+  <section class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-4">总评</h2>
+    <div id="summary-content"></div>
+  </section>
+</div>
+
+<script>
+const report = JSON.parse(sessionStorage.getItem("ielts_report") || "{}");
+const question = JSON.parse(sessionStorage.getItem("ielts_question") || "{}");
+
+if (!report.metadata) {
+  document.body.innerHTML = '<div class="p-8 text-center text-slate-500">没有报告数据,<a href="/" class="text-purple-600 underline">返回练习</a></div>';
+} else {
+  renderReport();
+}
+
+function renderReport() {
+  // HTML 转义工具(防止 LLM 输出含 < > & 引发 XSS)
+  const esc = (s) => {
+    if (s == null) return "";
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  };
+
+  // 递归 escape LLM 输出数据(只对字符串字段)
+  const sanitize = (obj) => {
+    if (Array.isArray(obj)) return obj.map(sanitize);
+    if (obj && typeof obj === "object") {
+      const out = {};
+      for (const [k, v] of Object.entries(obj)) {
+        out[k] = typeof v === "string" ? esc(v) : sanitize(v);
+      }
+      return out;
+    }
+    return obj;
+  };
+
+  // 处理数据(escape 所有 LLM 返回的字符串)
+  const mainDetails = sanitize(report.main_score_details || []);
+  const subScores = sanitize(report.sub_scores || []);
+  const sentFB = sanitize(report.sentence_feedback || []);
+  const zpd = sanitize(report.zpd_examples || []);
+  const summary = report.summary ? sanitize(report.summary) : {};
+
+  // ===== 渲染 =====
+document.getElementById("question-display").textContent =
+  question.prompt || report.metadata?.question_text || "";
+document.getElementById("overall-score").textContent =
+  report.scores?.Overall ?? "--";
+document.getElementById("cefr-level").textContent =
+  "CEFR " + (report.metadata?.cefr_level || "—");
+document.getElementById("disclaimer").textContent =
+  report.metadata?.disclaimer || "";
+
+// 雷达图
+const radarCtx = document.getElementById("radar-chart").getContext("2d");
+new Chart(radarCtx, {
+  type: "radar",
+  data: {
+    labels: ["FC\n流利度与连贯性", "LR\n词汇丰富度", "GRA\n语法多样性及准确性", "P\n发音"],
+    datasets: [{
+      label: "本次评分",
+      data: [
+        report.scores?.FC ?? 0,
+        report.scores?.LR ?? 0,
+        report.scores?.GRA ?? 0,
+        report.scores?.P ?? 0,
+      ],
+      backgroundColor: "rgba(144, 19, 254, 0.25)",
+      borderColor: "#9013fe",
+      pointBackgroundColor: "#9013fe",
+      borderWidth: 2,
+    }],
+  },
+  options: {
+    scales: { r: { suggestedMin: 0, suggestedMax: 9, ticks: { stepSize: 1.5 } } },
+    plugins: { legend: { display: false } },
+  },
+});
+
+// 主维卡片
+const MAIN_DIM_INFO = {
+  FC: { name: "FC", fullName: "流利度与连贯性", desc: "语速、自然停顿、连接手段、逻辑结构" },
+  LR: { name: "LR", fullName: "词汇丰富度", desc: "词汇范围、搭配、变换措辞、地道表达" },
+  GRA: { name: "GRA", fullName: "语法多样性与准确性", desc: "句式复杂度、错误频率" },
+  P:  { name: "P",  fullName: "发音", desc: "可理解度、清晰度、重音、语调、节奏" },
+};
+const mainGrid = document.getElementById("main-dim-grid");
+(mainDetails).forEach(d => {
+  const info = MAIN_DIM_INFO[d.criterion] || {};
+  const card = document.createElement("div");
+  card.className = "dim-card bg-slate-50 rounded p-4";
+  card.innerHTML = `
+    <div class="flex justify-between items-baseline">
+      <h3 class="font-medium text-slate-900">${info.fullName || d.criterion}</h3>
+      <span class="text-2xl font-bold text-purple-600">${d.band}</span>
+    </div>
+    <p class="text-xs text-slate-500 mt-1">${info.desc || ""}</p>
+    <blockquote class="text-xs text-slate-600 mt-3 italic border-l-2 border-purple-300 pl-2">"${d.descriptor_match || ""}"</blockquote>
+    <p class="text-sm text-slate-700 mt-3">${d.reasoning || ""}</p>
+  `;
+  mainGrid.appendChild(card);
+});
+
+// 14 子维
+const subGrid = document.getElementById("sub-dim-grid");
+(subScores).forEach(s => {
+  const card = document.createElement("div");
+  card.className = "border border-slate-200 rounded p-3 hover:border-purple-500 transition";
+  card.innerHTML = `
+    <div class="flex justify-between items-baseline">
+      <p class="text-sm font-medium text-slate-700">${s.sub_dimension}</p>
+      <span class="text-lg font-bold text-purple-600">${s.band}</span>
+    </div>
+    <p class="text-xs text-slate-500 mt-1">${s.evidence || ""}</p>
+  `;
+  card.onclick = () => alert(s.reasoning || "");
+  card.title = "点击查看详细推理";
+  subGrid.appendChild(card);
+});
+
+// 句子反馈
+const sentList = document.getElementById("sentences-list");
+(sentFB).forEach(s => {
+  const card = document.createElement("div");
+  card.className = "border border-slate-200 rounded p-4";
+  card.innerHTML = `
+    <div class="flex items-baseline gap-2 mb-2">
+      <span class="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded">句 #${s.sentence_id}</span>
+      <span class="text-slate-500 text-xs">${(s.start || 0).toFixed(1)}s - ${(s.end || 0).toFixed(1)}s</span>
+    </div>
+    <p class="text-slate-900 italic mb-3">"${s.original}"</p>
+    ${s.issues && s.issues.length ? `
+      <div class="mb-3">
+        <p class="text-xs text-red-600 font-medium mb-1">发现的问题:</p>
+        <ul class="text-sm text-slate-700 space-y-1">
+          ${s.issues.map(i => `
+            <li>
+              <span class="text-xs text-slate-500">[${i.severity} ${i.type}]</span>
+              ${i.description}
+              <code class="bg-slate-100 px-1 rounded text-xs">${i.location}</code>
+            </li>`).join("")}
+        </ul>
+      </div>` : ""}
+    ${s.improvements && s.improvements.length ? `
+      <div class="mb-3">
+        <p class="text-xs text-green-600 font-medium mb-1">建议改进:</p>
+        <ul class="text-sm text-slate-700 space-y-2">
+          ${s.improvements.map(im => `
+            <li>
+              <code class="bg-red-50 line-through text-xs">${im.original}</code>
+              →
+              <code class="bg-green-50 text-xs">${im.suggested}</code>
+              <span class="text-xs text-slate-500">${im.reason}</span>
+            </li>`).join("")}
+        </ul>
+      </div>` : ""}
+    ${s.model_answer ? `
+      <div class="mt-3 bg-purple-50 rounded p-3">
+        <p class="text-xs text-purple-600 font-medium">范文 (Band 7-8):</p>
+        <p class="text-sm text-slate-800">"${s.model_answer}"</p>
+      </div>` : ""}
+  `;
+  sentList.appendChild(card);
+});
+
+// ZPD
+const zpdList = document.getElementById("zpd-list");
+(zpd).forEach((z, idx) => {
+  const card = document.createElement("div");
+  card.className = "border border-slate-200 rounded p-4";
+  card.innerHTML = `
+    <div class="flex items-baseline justify-between mb-2">
+      <span class="text-sm font-medium text-slate-700">范例 #${idx + 1}: ${z.sub_dimension || z.learner_sentence?.slice(0, 20) || ""}</span>
+      <div class="text-xs">
+        <span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded">当前 ${z.current_band || "?"}</span>
+        →
+        <span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded">ZPD ${z.zpd_target_band || "?"}</span>
+      </div>
+    </div>
+    ${z.improved_version ? `
+      <div class="mt-2 bg-green-50 rounded p-3">
+        <p class="text-xs text-green-700 font-medium">改进版:</p>
+        <p class="text-sm text-slate-800">"${z.improved_version}"</p>
+      </div>` : ""}
+    ${z.what_changed ? `
+      <ul class="text-sm text-slate-700 mt-2 space-y-1">
+        ${z.what_changed.map(w => `
+          <li>
+            <code class="bg-red-50 line-through text-xs">${w.from}</code>
+            →
+            <code class="bg-green-50 text-xs">${w.to}</code>
+            <span class="text-xs text-slate-500">${w.why}</span>
+          </li>`).join("")}
+      </ul>` : ""}
+    ${z.next_step?.harder_version ? `
+      <div class="mt-3 bg-purple-50 rounded p-3">
+        <p class="text-xs text-purple-600 font-medium">下一步挑战 (Band ${(z.zpd_target_band || 0) + 0.5}):</p>
+        <p class="text-sm text-slate-800">"${z.next_step.harder_version}"</p>
+        <p class="text-xs text-slate-500 mt-1">${z.next_step.challenge || ""}</p>
+      </div>` : ""}
+    ${z.practice_tip ? `
+      <p class="text-xs text-slate-600 mt-2">💡 ${z.practice_tip}</p>` : ""}
+  `;
+  zpdList.appendChild(card);
+});
+
+// 总评
+document.getElementById("summary-content").innerHTML = `
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="bg-green-50 rounded p-4">
+      <h3 class="font-medium text-green-800 mb-2">优势</h3>
+      <ul class="text-sm text-slate-700 space-y-1">
+        ${(summary.strengths || []).map(s => `<li>• ${s}</li>`).join("")}
+      </ul>
+    </div>
+    <div class="bg-red-50 rounded p-4">
+      <h3 class="font-medium text-red-800 mb-2">待改进</h3>
+      <ul class="text-sm text-slate-700 space-y-1">
+        ${(summary.weaknesses || []).map(s => `<li>• ${s}</li>`).join("")}
+      </ul>
+    </div>
+  </div>
+  <div class="mt-4 bg-purple-50 rounded p-4">
+    <h3 class="font-medium text-purple-800 mb-2">优先改进建议</h3>
+    <ol class="text-sm text-slate-700 space-y-1 list-decimal list-inside">
+      ${(summary.priority_improvements || []).map(s => `<li>${s}</li>`).join("")}
+    </ol>
+  </div>
+`;
+}
+</script>
+</body>
+</html>

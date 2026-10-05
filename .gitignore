@@ -1,0 +1,34 @@
+# 数据
+data/
+*.wav
+*.mp3
+*.webm
+*.m4a
+
+# 测试产物
+tests/real_audio.*
+tests/test.wav
+tests/real_report.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+*.egg-info/
+
+# Node/前端
+node_modules/
+dist/
+
+# 环境
+.env
+.env.local
+backend/.env
+
+# 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
